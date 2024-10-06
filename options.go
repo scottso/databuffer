@@ -24,19 +24,19 @@ type Options[T any] struct {
 type DefaultLogger[T any] struct{}
 
 func (d DefaultLogger[T]) Debug(s string) {
-	log.Println(s)
+	log.Printf("DEBUG %s", s)
 }
 
 func (d DefaultLogger[T]) Info(s string) {
-	log.Println(s)
+	log.Printf("INFO %s", s)
 }
 
 func (d DefaultLogger[T]) Warn(s string) {
-	log.Println(s)
+	log.Printf("WARN %s", s)
 }
 
 func (d DefaultLogger[T]) Error(s string) {
-	log.Println(s)
+	log.Printf("ERROR %s", s)
 }
 
 type DefaultReporter[T any] struct{}
