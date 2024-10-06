@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type Reporter struct{}
+type NilReporter struct{}
 
-func (r Reporter) Report(_ []string) error {
+func (r NilReporter) Report(_ []string) error {
 	// emulate some delay in sending data
 	time.Sleep(time.Second)
 
@@ -24,12 +24,10 @@ func TestDataBuffer(t *testing.T) {
 		NumWorkers:    2,
 		MaxBufferSize: 128,
 		WorkerWait:    3 * time.Second,
-		Reporter:      Reporter{},
+		Reporter:      NilReporter{},
 	}
 
-	ch := make(chan string)
-
-	dbuf, err := databuffer.New(ch, opts)
+	dbuf, err := databuffer.New(opts)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.TODO())
@@ -39,9 +37,8 @@ func TestDataBuffer(t *testing.T) {
 
 	go func() {
 		for _, s := range GenerateRandomStrings(1001, 8) {
-			ch <- s
+			dbuf.WorkerChan() <- s
 		}
-
 		cancel()
 	}()
 

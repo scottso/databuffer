@@ -23,13 +23,9 @@ type DataBuffer[T any] struct {
 	maxBufferSize int
 	workerWait    time.Duration
 	log           Logger
-	in            <-chan T
+	in            chan T
 	startOnce     sync.Once
 	Reporter[T]
-}
-
-func (b *DataBuffer[T]) GetWorkerChan() <-chan T {
-	return b.in
 }
 
 // Start the workers.
@@ -40,6 +36,10 @@ func (b *DataBuffer[T]) Start(ctx context.Context) {
 			go b.worker(ctx, i)
 		}
 	})
+}
+
+func (b *DataBuffer[T]) WorkerChan() chan<- T {
+	return b.in
 }
 
 // Flush and empy the buffer.
@@ -66,12 +66,12 @@ workerLoop:
 	for {
 		select {
 		case data, ok := <-b.in:
-			if !ok {
-				break workerLoop
-			}
 			buffer = append(buffer, data)
 			if len(buffer) >= b.maxBufferSize {
 				buffer = b.report(workerID, buffer)
+			}
+			if !ok {
+				break workerLoop
 			}
 		case <-ticker:
 			buffer = b.report(workerID, buffer)
@@ -84,7 +84,7 @@ workerLoop:
 	b.report(workerID, buffer)
 }
 
-func New[T any](ch <-chan T, options ...Options[T]) (*DataBuffer[T], error) {
+func New[T any](options ...Options[T]) (*DataBuffer[T], error) {
 	opts := GetDefaultOptions[T]()
 	if len(options) > 0 {
 		opts = options[0]
@@ -94,6 +94,8 @@ func New[T any](ch <-chan T, options ...Options[T]) (*DataBuffer[T], error) {
 	if err != nil {
 		return nil, err
 	}
+
+	ch := make(chan T)
 
 	return &DataBuffer[T]{
 		numWorkers:    opts.NumWorkers,
