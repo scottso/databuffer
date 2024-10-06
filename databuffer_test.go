@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/scottso/databuffer.go"
+	"github.com/scottso/databuffer"
 	"github.com/stretchr/testify/require"
 )
 

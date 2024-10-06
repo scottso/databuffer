@@ -1,4 +1,4 @@
-module github.com/scottso/databuffer.go
+module github.com/scottso/databuffer
 
 go 1.23.2
 
