@@ -23,7 +23,7 @@ type DataBuffer[T any] struct {
 	maxBufferSize int
 	workerWait    time.Duration
 	log           Logger
-	in            chan T
+	in            chan []T
 	startOnce     sync.Once
 	Reporter[T]
 }
@@ -38,7 +38,7 @@ func (b *DataBuffer[T]) Start(ctx context.Context) {
 	})
 }
 
-func (b *DataBuffer[T]) WorkerChan() chan<- T {
+func (b *DataBuffer[T]) WorkerChan() chan<- []T {
 	return b.in
 }
 
@@ -66,7 +66,7 @@ workerLoop:
 	for {
 		select {
 		case data, ok := <-b.in:
-			buffer = append(buffer, data)
+			buffer = append(buffer, data...)
 			if len(buffer) >= b.maxBufferSize {
 				buffer = b.report(workerID, buffer)
 			}
@@ -76,7 +76,10 @@ workerLoop:
 		case <-ticker:
 			buffer = b.report(workerID, buffer)
 		case <-ctx.Done():
-			break workerLoop
+			if workerID == 0 {
+				close(b.in)
+				break workerLoop
+			}
 		}
 	}
 
@@ -95,13 +98,11 @@ func New[T any](options ...Options[T]) (*DataBuffer[T], error) {
 		return nil, err
 	}
 
-	ch := make(chan T)
-
 	return &DataBuffer[T]{
 		numWorkers:    opts.NumWorkers,
 		maxBufferSize: opts.MaxBufferSize,
 		workerWait:    opts.WorkerWait,
-		in:            ch,
+		in:            make(chan []T),
 		log:           opts.Logger,
 		Reporter:      opts.Reporter,
 	}, nil

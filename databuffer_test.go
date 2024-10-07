@@ -36,8 +36,8 @@ func TestDataBuffer(t *testing.T) {
 	dbuf.Start(ctx)
 
 	go func() {
-		for _, s := range GenerateRandomStrings(1001, 8) {
-			dbuf.WorkerChan() <- s
+		for _, s := range GenerateRandomStrings(1024, 8) {
+			dbuf.WorkerChan() <- []string{s}
 		}
 		cancel()
 	}()
