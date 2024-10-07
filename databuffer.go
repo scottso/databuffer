@@ -74,6 +74,7 @@ workerLoop:
 				break workerLoop
 			}
 		case <-ticker:
+			b.log.Debug(fmt.Sprintf("worker %d wait ticker fired", workerID))
 			buffer = b.report(workerID, buffer)
 		case <-ctx.Done():
 			if workerID == 0 {

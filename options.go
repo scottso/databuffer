@@ -17,8 +17,9 @@ type Options[T any] struct {
 	WorkerWait    time.Duration
 	MaxBufferSize int
 	NumWorkers    int
-	Reporter      Reporter[T]
-	Logger        Logger
+	// This must be concurrency safe or panics will occur
+	Reporter Reporter[T]
+	Logger   Logger
 }
 
 type DefaultLogger[T any] struct{}
