@@ -3,6 +3,7 @@ package databuffer_test
 import (
 	"context"
 	"math/rand/v2"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,40 +11,64 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type NilReporter struct{}
+type RecorderReporter struct {
+	results []string
+	sync.RWMutex
+}
 
-func (r NilReporter) Report(_ []string) error {
-	// emulate some delay in sending data
-	time.Sleep(time.Second)
+func (r *RecorderReporter) Report(data []string) error {
+	func() {
+		r.Lock()
+		defer r.Unlock()
+		r.results = append(r.results, data...)
+	}()
+
+	// emulate some network latency in sending data
+	n := rand.Int64N(1000)
+	time.Sleep(time.Duration(n) * time.Millisecond)
 
 	return nil
 }
 
+func (r *RecorderReporter) GetResults() []string {
+	r.RLock()
+	defer r.RUnlock()
+	return r.results
+}
+
 func TestDataBuffer(t *testing.T) {
+	const numStrings = 2001
+
+	reporter := &RecorderReporter{}
+
 	opts := databuffer.Options[string]{
-		NumWorkers:    2,
+		NumWorkers:    6,
 		MaxBufferSize: 128,
 		WorkerWait:    3 * time.Second,
-		Reporter:      NilReporter{},
+		Reporter:      reporter,
 	}
 
 	dbuf, err := databuffer.New(opts)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	dbuf.Start(ctx)
 
 	go func() {
-		for _, s := range GenerateRandomStrings(1024, 8) {
+		for _, s := range GenerateRandomStrings(numStrings, 8) {
 			dbuf.WorkerChan() <- []string{s}
+			n := rand.Int64N(5)
+			time.Sleep(time.Duration(n) * time.Millisecond)
 		}
 		cancel()
 	}()
 
 	<-ctx.Done()
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
+
+	require.Equal(t, numStrings, len(reporter.GetResults()))
 }
 
 func GenerateRandomStrings(num int, length int) []string {
