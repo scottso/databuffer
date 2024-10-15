@@ -68,7 +68,7 @@ func TestDataBuffer(t *testing.T) {
 	<-ctx.Done()
 	time.Sleep(1 * time.Second)
 
-	require.Equal(t, numStrings, len(reporter.GetResults()))
+	require.Len(t, reporter.GetResults(), numStrings)
 }
 
 func TestDataBufferSlices(t *testing.T) {
@@ -80,10 +80,11 @@ func TestDataBufferSlices(t *testing.T) {
 	reporter := &RecorderReporter{}
 
 	opts := databuffer.Options[string]{
-		NumWorkers:    4,
-		MaxBufferSize: 512,
-		WorkerWait:    3 * time.Second,
-		Reporter:      reporter,
+		NumWorkers:     4,
+		MaxBufferSize:  512,
+		ChanBufferSize: 512 / 4,
+		WorkerWait:     3 * time.Second,
+		Reporter:       reporter,
 	}
 
 	dbuf, err := databuffer.New(opts)

@@ -99,11 +99,13 @@ func New[T any](options ...Options[T]) (*DataBuffer[T], error) {
 		return nil, err
 	}
 
+	ch := make(chan []T, opts.ChanBufferSize)
+
 	return &DataBuffer[T]{
 		numWorkers:    opts.NumWorkers,
 		maxBufferSize: opts.MaxBufferSize,
 		workerWait:    opts.WorkerWait,
-		in:            make(chan []T),
+		in:            ch,
 		log:           opts.Logger,
 		Reporter:      opts.Reporter,
 	}, nil
