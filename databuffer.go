@@ -44,6 +44,10 @@ func (b *DataBuffer[T]) WorkerChan() chan<- []T {
 
 // Flush and empy the buffer.
 func (b *DataBuffer[T]) report(workerID int, buffer []T) []T {
+	if len(buffer) == 0 {
+		return buffer
+	}
+
 	b.log.Debug(fmt.Sprintf("databuffer worker %d sending %d items", workerID, len(buffer)))
 
 	if err := b.Report(buffer); err != nil {
