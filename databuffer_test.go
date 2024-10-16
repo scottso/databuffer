@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/scottso/databuffer"
+	"git.soma.salesforce.com/epic/epic-copilot-handler-service/internal/databuffer"
+
 	"github.com/stretchr/testify/require"
 )
 
