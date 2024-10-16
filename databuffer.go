@@ -31,7 +31,7 @@ type DataBuffer[T any] struct {
 // Start the workers.
 func (b *DataBuffer[T]) Start(ctx context.Context) {
 	b.startOnce.Do(func() {
-		b.log.Info(fmt.Sprintf("Starting %d buffer workers", b.numWorkers))
+		b.log.Info(fmt.Sprintf("Starting %d databuffer workers", b.numWorkers))
 		for i := range b.numWorkers {
 			go b.worker(ctx, i)
 		}
@@ -44,10 +44,10 @@ func (b *DataBuffer[T]) WorkerChan() chan<- []T {
 
 // Flush and empy the buffer.
 func (b *DataBuffer[T]) report(workerID int, buffer []T) []T {
-	b.log.Debug(fmt.Sprintf("worker %d sending %d items", workerID, len(buffer)))
+	b.log.Debug(fmt.Sprintf("databuffer worker %d sending %d items", workerID, len(buffer)))
 
 	if err := b.Report(buffer); err != nil {
-		err = fmt.Errorf("worker %d error sending data: %w", workerID, err)
+		err = fmt.Errorf("databuffer worker %d error sending data: %w", workerID, err)
 		b.log.Error(err.Error())
 
 		// return the original buffer if we couldn't send
@@ -74,7 +74,7 @@ workerLoop:
 				break workerLoop
 			}
 		case <-ticker:
-			b.log.Debug(fmt.Sprintf("worker %d wait ticker fired", workerID))
+			b.log.Debug(fmt.Sprintf("databuffer worker %d wait ticker fired", workerID))
 			buffer = b.report(workerID, buffer)
 		case <-ctx.Done():
 			if workerID == 0 {
@@ -84,7 +84,7 @@ workerLoop:
 		}
 	}
 
-	b.log.Debug(fmt.Sprintf("worker %d sending any remaining data and shutting down", workerID))
+	b.log.Debug(fmt.Sprintf("databuffer worker %d sending any remaining data and shutting down", workerID))
 	b.report(workerID, buffer)
 }
 
