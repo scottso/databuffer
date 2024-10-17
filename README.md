@@ -12,10 +12,21 @@ If `Options.BufferHardLimit` is set to 0, the buffers are unbound and will grow 
 
 ## Example
 ```golang
-type reporter struct {}
+package main
+
+import (
+	"context"
+	"time"
+
+	"github.com/scottso/databuffer"
+)
+
+type reporter struct{}
 
 func (r reporter) Report(data []int) error {
-	...Do stuff with data...
+	// ...Do stuff with data...
+
+	return nil
 }
 
 func main() {
@@ -24,28 +35,28 @@ func main() {
 	opts.WorkerWait = 5 * time.Minute
 	opts.MaxBufferSize = 1024
 	opts.BufferHardLimit = 4096
-	opts.Reporter =  reporter{}
+	opts.Reporter = reporter{}
 
-  // Use a buffered channel
-  opts.ChanBufferSize = 16
+	// Use a buffered channel
+	opts.ChanBufferSize = 16
 
 	dBuf, err := databuffer.New(opts)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
-  ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
-  // start the workers
-  dBuf.Start(ctx)
+	// start the workers
+	dBuf.Start(ctx)
 
-  go func() {
-  	for i := range 10000 {
-    	dBuf.WorkerChan() <- i
-  	}
-    cancel()
-  }
+	go func() {
+		for i := range 10000 {
+			dBuf.WorkerChan() <- []int{i}
+		}
+		cancel()
+	}()
 
-  <-ctx.Done
+	<-ctx.Done()
 }
 ```
