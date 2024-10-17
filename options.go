@@ -3,8 +3,9 @@ package databuffer
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -26,8 +27,9 @@ type Options[T any] struct {
 	// that grows beyond this will have its contents dropped if it cannot report
 	// successfully. Default is 2 * MaxBufferSize
 	BufferHardLimit int
-	NumWorkers      int
-	// Size of the worker channel buffer.  Defaults to unbuffered.
+	// Number of worker goroutines to process incoming data. Default 2.
+	NumWorkers int
+	// Size of the worker channel buffer.  Defaults to unbuffered channel.
 	ChanBufferSize int
 	// This must be concurrency safe or panics will occur
 	Reporter Reporter[T]
@@ -37,19 +39,19 @@ type Options[T any] struct {
 type DefaultLogger[T any] struct{}
 
 func (d DefaultLogger[T]) Debug(s string) {
-	log.Printf("DEBUG %s", s)
+	log.Debug().Msgf("%s", s)
 }
 
 func (d DefaultLogger[T]) Info(s string) {
-	log.Printf("INFO %s", s)
+	log.Info().Msgf("INFO %s", s)
 }
 
 func (d DefaultLogger[T]) Warn(s string) {
-	log.Printf("WARN %s", s)
+	log.Warn().Msgf("WARN %s", s)
 }
 
 func (d DefaultLogger[T]) Error(s string) {
-	log.Printf("ERROR %s", s)
+	log.Error().Msgf("ERROR %s", s)
 }
 
 type DefaultReporter[T any] struct{}
@@ -67,7 +69,7 @@ func GetDefaultOptions[T any]() Options[T] {
 	}
 }
 
-func validateOptions[T any](opts Options[T]) (Options[T], error) {
+func ValidateOptions[T any](opts Options[T]) (Options[T], error) {
 	if opts.Logger == nil {
 		opts.Logger = &DefaultLogger[T]{}
 		opts.Logger.Warn("databuffer logger option is nil; using default logger")
@@ -78,17 +80,17 @@ func validateOptions[T any](opts Options[T]) (Options[T], error) {
 		return opts, errors.New("databuffer reporter option is nil")
 	}
 
-	if opts.WorkerWait == 0 {
-		opts.Logger.Warn(fmt.Sprintf("databuffer worker wait time is 0; setting to %s", defaultWorkerWait))
+	if opts.WorkerWait <= 0 {
+		opts.Logger.Warn(fmt.Sprintf("invalid databuffer worker wait time is %s; setting to %s", opts.WorkerWait, defaultWorkerWait))
 		opts.WorkerWait = time.Minute
 	}
 
-	if opts.MaxBufferSize == 0 {
+	if opts.MaxBufferSize <= 0 {
 		opts.Logger.Warn(fmt.Sprintf("invalid data buffer size %d, setting to %d", opts.MaxBufferSize, defaultMaxBufferSize))
 		opts.MaxBufferSize = defaultMaxBufferSize
 	}
 
-	if opts.BufferHardLimit > 0 && opts.BufferHardLimit < opts.MaxBufferSize {
+	if opts.BufferHardLimit < 0 || opts.BufferHardLimit > 0 && opts.BufferHardLimit < opts.MaxBufferSize {
 		opts.Logger.Warn(fmt.Sprintf("buffer hard limit is less than max buffer size; setting to %d", defaultBufferHardLimit))
 		opts.BufferHardLimit = defaultBufferHardLimit
 	}

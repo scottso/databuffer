@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"git.soma.salesforce.com/epic/epic-copilot-handler-service/internal/databuffer"
+	"github.com/scottso/databuffer"
 
 	"github.com/stretchr/testify/require"
 )
@@ -35,6 +35,43 @@ func (r *RecorderReporter) GetResults() []string {
 	r.RLock()
 	defer r.RUnlock()
 	return r.results
+}
+
+func TestOptionsValidations(t *testing.T) {
+	opts := databuffer.GetDefaultOptions[string]()
+	opts.BufferHardLimit = -1
+	opts, err := databuffer.ValidateOptions(opts)
+	require.NoError(t, err)
+	require.Equal(t, databuffer.GetDefaultOptions[string]().BufferHardLimit, opts.BufferHardLimit)
+
+	opts = databuffer.GetDefaultOptions[string]()
+	opts.MaxBufferSize = 0
+	opts, err = databuffer.ValidateOptions(opts)
+	require.NoError(t, err)
+	require.Equal(t, databuffer.GetDefaultOptions[string]().MaxBufferSize, opts.MaxBufferSize)
+
+	opts = databuffer.GetDefaultOptions[string]()
+	opts.NumWorkers = 0
+	opts, err = databuffer.ValidateOptions(opts)
+	require.NoError(t, err)
+	require.Equal(t, databuffer.GetDefaultOptions[string]().NumWorkers, opts.NumWorkers)
+
+	opts = databuffer.GetDefaultOptions[string]()
+	opts.Reporter = nil
+	opts, err = databuffer.ValidateOptions(opts)
+	require.Error(t, err)
+
+	opts = databuffer.GetDefaultOptions[string]()
+	opts.Logger = nil
+	opts, err = databuffer.ValidateOptions(opts)
+	require.NoError(t, err)
+	require.IsType(t, new(databuffer.DefaultLogger[string]), opts.Logger)
+
+	opts = databuffer.GetDefaultOptions[string]()
+	opts.WorkerWait = -1
+	opts, err = databuffer.ValidateOptions(opts)
+	require.NoError(t, err)
+	require.Equal(t, databuffer.GetDefaultOptions[string]().WorkerWait, opts.WorkerWait)
 }
 
 func TestDataBuffer(t *testing.T) {
@@ -108,7 +145,7 @@ func TestDataBufferSlices(t *testing.T) {
 	<-ctx.Done()
 	time.Sleep(1 * time.Second)
 
-	require.Equal(t, numStrings*numGenerations, len(reporter.GetResults()))
+	require.Len(t, reporter.GetResults(), numStrings*numGenerations)
 }
 
 func GenerateRandomStrings(num int, length int) []string {

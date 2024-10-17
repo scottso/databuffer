@@ -104,7 +104,7 @@ func New[T any](options ...Options[T]) (*DataBuffer[T], error) {
 		opts = options[0]
 	}
 
-	opts, err := validateOptions(opts)
+	opts, err := ValidateOptions(opts)
 	if err != nil {
 		return nil, err
 	}
