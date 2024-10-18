@@ -3,12 +3,14 @@ package databuffer_test
 import (
 	"context"
 	"math/rand/v2"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/scottso/databuffer"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,6 +39,10 @@ func (r *RecorderReporter) GetResults() []string {
 	return r.results
 }
 
+func init() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.TimeOnly}).With().Caller().Logger()
+}
+
 func TestOptionsValidations(t *testing.T) {
 	opts := databuffer.GetDefaultOptions[string]()
 	opts.BufferHardLimit = -1
@@ -60,12 +66,6 @@ func TestOptionsValidations(t *testing.T) {
 	opts.Reporter = nil
 	opts, err = databuffer.ValidateOptions(opts)
 	require.Error(t, err)
-
-	opts = databuffer.GetDefaultOptions[string]()
-	opts.Logger = nil
-	opts, err = databuffer.ValidateOptions(opts)
-	require.NoError(t, err)
-	require.IsType(t, new(databuffer.DefaultLogger[string]), opts.Logger)
 
 	opts = databuffer.GetDefaultOptions[string]()
 	opts.WorkerWait = -1
