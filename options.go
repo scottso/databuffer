@@ -31,20 +31,26 @@ type Options[T any] struct {
 	// Size of the worker channel buffer.  Defaults to unbuffered channel.
 	ChanBufferSize int
 	// This must be concurrency safe or panics will occur
-	Reporter Reporter[T]
+	Reporter         Reporter[T]
+	FallbackReporter FallbackReporter[T]
 }
 
 type DefaultReporter[T any] struct{}
 
-func (d DefaultReporter[T]) Report(_ []T) error { return nil }
+func (d DefaultReporter[T]) Report([]T) error { return nil }
+
+type DefaultFallbackReporter[T any] struct{}
+
+func (b DefaultFallbackReporter[T]) Save([]T) error { return nil }
 
 func GetDefaultOptions[T any]() Options[T] {
 	return Options[T]{
-		MaxBufferSize:   defaultMaxBufferSize,
-		BufferHardLimit: defaultBufferHardLimit,
-		NumWorkers:      defaultNumWorkers,
-		WorkerWait:      defaultWorkerWait,
-		Reporter:        DefaultReporter[T]{},
+		MaxBufferSize:    defaultMaxBufferSize,
+		BufferHardLimit:  defaultBufferHardLimit,
+		NumWorkers:       defaultNumWorkers,
+		WorkerWait:       defaultWorkerWait,
+		Reporter:         DefaultReporter[T]{},
+		FallbackReporter: DefaultFallbackReporter[T]{},
 	}
 }
 
