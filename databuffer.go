@@ -14,6 +14,11 @@ type Reporter[T any] interface {
 	Report([]T) error
 }
 
+type FallbackReporter[T any] interface {
+	// This method MUST be concurrent safe or panics will ensue
+	Save([]T) error
+}
+
 type DataBuffer[T any] struct {
 	numWorkers      int
 	maxBufferSize   int
@@ -23,6 +28,7 @@ type DataBuffer[T any] struct {
 	in              chan []T
 	startOnce       sync.Once
 	Reporter[T]
+	FallbackReporter[T]
 }
 
 // Start the workers.
@@ -55,7 +61,19 @@ func (b *DataBuffer[T]) report(logger zerolog.Logger, buffer []T) []T {
 			return buffer
 		}
 
-		logger.Warn().Int("dropped", len(buffer)).Msgf("%T databuffer worker buffer hit hard limit; dropping data", *new(T))
+		logger.Warn().Msgf("%T databuffer worker buffer hit hard limit", *new(T))
+
+		if b.FallbackReporter != nil {
+			logger.Info().Msgf("%T databuffer worker saving to fallback reporter", *new(T))
+			if err := b.Save(buffer); err != nil {
+				logger.Error().
+					Err(err).
+					Int("dropped", len(buffer)).
+					Msgf("%T databuffer worker error saving to fallback reporter", *new(T))
+			}
+		}
+
+		logger.Warn().Int("dropped", len(buffer)).Msgf("%T databuffer worker buffer dropping data", *new(T))
 	}
 
 	// return a new empty buffer if we sent them off successfully
@@ -107,12 +125,13 @@ func New[T any](options ...Options[T]) (*DataBuffer[T], error) {
 	ch := make(chan []T, opts.ChanBufferSize)
 
 	return &DataBuffer[T]{
-		numWorkers:      opts.NumWorkers,
-		maxBufferSize:   opts.MaxBufferSize,
-		bufferHardLimit: opts.BufferHardLimit,
-		workerWait:      opts.WorkerWait,
-		in:              ch,
-		logger:          log.Logger,
-		Reporter:        opts.Reporter,
+		numWorkers:       opts.NumWorkers,
+		maxBufferSize:    opts.MaxBufferSize,
+		bufferHardLimit:  opts.BufferHardLimit,
+		workerWait:       opts.WorkerWait,
+		in:               ch,
+		logger:           log.Logger,
+		Reporter:         opts.Reporter,
+		FallbackReporter: opts.FallbackReporter,
 	}, nil
 }
