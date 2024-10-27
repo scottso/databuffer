@@ -11,7 +11,7 @@ import (
 
 type Reporter[T any] interface {
 	// This method MUST be concurrent safe or panics will ensue
-	Report([]T) error
+	Report(context.Context, []T) error
 }
 
 type DataBuffer[T any] struct {
@@ -40,14 +40,16 @@ func (b *DataBuffer[T]) WorkerChan() chan<- []T {
 }
 
 // Flush and empy the buffer.
-func (b *DataBuffer[T]) report(logger zerolog.Logger, buffer []T) []T {
+func (b *DataBuffer[T]) report(ctx context.Context, buffer []T) []T {
 	if len(buffer) == 0 {
 		return buffer
 	}
 
+	logger := zerolog.Ctx(ctx)
+
 	logger.Debug().Int("sent", len(buffer)).Msgf("%T databuffer worker sending items", *new(T))
 
-	if err := b.Report(buffer); err != nil {
+	if err := b.Report(ctx, buffer); err != nil {
 		logger.Error().Err(err).Msgf("%T databuffer worker error sending data", *new(T))
 
 		// return the original buffer if we couldn't send and we're less than the hard limit
@@ -55,7 +57,9 @@ func (b *DataBuffer[T]) report(logger zerolog.Logger, buffer []T) []T {
 			return buffer
 		}
 
-		logger.Warn().Int("dropped", len(buffer)).Msgf("%T databuffer worker buffer hit hard limit; dropping data", *new(T))
+		logger.Warn().
+			Int("dropped", len(buffer)).
+			Msgf("%T databuffer worker buffer hit hard limit; dropping data", *new(T))
 	}
 
 	// return a new empty buffer if we sent them off successfully
@@ -65,7 +69,8 @@ func (b *DataBuffer[T]) report(logger zerolog.Logger, buffer []T) []T {
 func (b *DataBuffer[T]) worker(ctx context.Context, workerID int) {
 	buffer := make([]T, 0, b.maxBufferSize)
 	ticker := time.Tick(b.workerWait)
-	logger := b.logger.With().Int("worker_id", workerID).Logger()
+	logger := b.logger.With().Ctx(ctx).Int("worker_id", workerID).Logger()
+	ctx = logger.WithContext(ctx)
 
 workerLoop:
 	for {
@@ -73,14 +78,14 @@ workerLoop:
 		case data, ok := <-b.in:
 			buffer = append(buffer, data...)
 			if len(buffer) >= b.maxBufferSize {
-				buffer = b.report(logger, buffer)
+				buffer = b.report(ctx, buffer)
 			}
 			if !ok {
 				break workerLoop
 			}
 		case <-ticker:
 			logger.Debug().Msgf("%T databuffer worker wait ticker fired", *new(T))
-			buffer = b.report(logger, buffer)
+			buffer = b.report(ctx, buffer)
 		case <-ctx.Done():
 			if workerID == 0 {
 				close(b.in)
@@ -89,8 +94,9 @@ workerLoop:
 		}
 	}
 
-	logger.Debug().Msgf("%T databuffer worker sending any remaining data and shutting down", *new(T))
-	b.report(logger, buffer)
+	logger.Debug().
+		Msgf("%T databuffer worker sending any remaining data and shutting down", *new(T))
+	b.report(ctx, buffer)
 }
 
 func New[T any](options ...Options[T]) (*DataBuffer[T], error) {

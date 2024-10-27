@@ -1,6 +1,7 @@
 package databuffer
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -36,7 +37,7 @@ type Options[T any] struct {
 
 type DefaultReporter[T any] struct{}
 
-func (d DefaultReporter[T]) Report(_ []T) error { return nil }
+func (d DefaultReporter[T]) Report(context.Context, []T) error { return nil }
 
 func GetDefaultOptions[T any]() Options[T] {
 	return Options[T]{
@@ -56,22 +57,27 @@ func ValidateOptions[T any](opts Options[T]) (Options[T], error) {
 	}
 
 	if opts.WorkerWait <= 0 {
-		log.Warn().Msgf("invalid databuffer worker wait time is %s; setting to %s", opts.WorkerWait, defaultWorkerWait)
+		log.Warn().
+			Msgf("invalid databuffer worker wait time is %s; setting to %s", opts.WorkerWait, defaultWorkerWait)
 		opts.WorkerWait = time.Minute
 	}
 
 	if opts.MaxBufferSize <= 0 {
-		log.Warn().Msgf("invalid data buffer size %d, setting to %d", opts.MaxBufferSize, defaultMaxBufferSize)
+		log.Warn().
+			Msgf("invalid data buffer size %d, setting to %d", opts.MaxBufferSize, defaultMaxBufferSize)
 		opts.MaxBufferSize = defaultMaxBufferSize
 	}
 
-	if opts.BufferHardLimit < 0 || opts.BufferHardLimit > 0 && opts.BufferHardLimit < opts.MaxBufferSize {
-		log.Warn().Msgf("buffer hard limit is less than max buffer size; setting to %d", defaultBufferHardLimit)
+	if opts.BufferHardLimit < 0 ||
+		opts.BufferHardLimit > 0 && opts.BufferHardLimit < opts.MaxBufferSize {
+		log.Warn().
+			Msgf("buffer hard limit is less than max buffer size; setting to %d", defaultBufferHardLimit)
 		opts.BufferHardLimit = defaultBufferHardLimit
 	}
 
 	if opts.NumWorkers < 1 {
-		log.Warn().Msgf("invalid number of workers %d, setting to default of %d", opts.NumWorkers, defaultNumWorkers)
+		log.Warn().
+			Msgf("invalid number of workers %d, setting to default of %d", opts.NumWorkers, defaultNumWorkers)
 		opts.NumWorkers = defaultNumWorkers
 	}
 

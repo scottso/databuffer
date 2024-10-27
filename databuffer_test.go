@@ -19,7 +19,7 @@ type RecorderReporter struct {
 	sync.RWMutex
 }
 
-func (r *RecorderReporter) Report(data []string) error {
+func (r *RecorderReporter) Report(ctx context.Context, data []string) error {
 	func() {
 		r.Lock()
 		defer r.Unlock()
@@ -40,7 +40,10 @@ func (r *RecorderReporter) GetResults() []string {
 }
 
 func init() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.TimeOnly}).With().Caller().Logger()
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.TimeOnly}).
+		With().
+		Caller().
+		Logger()
 }
 
 func TestOptionsValidations(t *testing.T) {
