@@ -67,10 +67,11 @@ func (b *DataBuffer[T]) report(ctx context.Context, buffer []T) []T {
 }
 
 func (b *DataBuffer[T]) worker(ctx context.Context, workerID int) {
-	const staggerMultiple = 5
+	const staggerWait = 1
+	time.Sleep(time.Duration(workerID*staggerWait) * time.Second)
 
 	buffer := make([]T, 0, b.maxBufferSize)
-	ticker := time.Tick(time.Duration(workerID*staggerMultiple) + b.workerWait)
+	ticker := time.Tick(b.workerWait)
 	logger := b.logger.With().Ctx(ctx).Int("worker_id", workerID).Logger()
 	ctx = logger.WithContext(ctx)
 
