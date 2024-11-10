@@ -107,7 +107,8 @@ func TestDataBuffer(t *testing.T) {
 	}()
 
 	<-ctx.Done()
-	time.Sleep(1 * time.Second)
+	// Wait for workers to shut down
+	time.Sleep(5 * time.Second)
 
 	require.Len(t, reporter.GetResults(), numStrings)
 }
@@ -146,7 +147,8 @@ func TestDataBufferSlices(t *testing.T) {
 	}()
 
 	<-ctx.Done()
-	time.Sleep(1 * time.Second)
+	// Wait for workers to shut down
+	time.Sleep(5 * time.Second)
 
 	require.Len(t, reporter.GetResults(), numStrings*numGenerations)
 }
