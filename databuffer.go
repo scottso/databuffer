@@ -9,10 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type Reporter[T any] interface {
-	// This method MUST be concurrent safe or panics will ensue
-	Report(context.Context, []T) error
-}
+type Reporter[T any] func(context.Context, []T) error
 
 type DataBuffer[T any] struct {
 	numWorkers      int
@@ -49,7 +46,7 @@ func (b *DataBuffer[T]) report(ctx context.Context, buffer []T) []T {
 
 	logger.Debug().Int("sent", len(buffer)).Msgf("%T databuffer worker sending items", *new(T))
 
-	if err := b.Report(ctx, buffer); err != nil {
+	if err := b.Reporter(ctx, buffer); err != nil {
 		logger.Error().Err(err).Msgf("%T databuffer worker error sending data", *new(T))
 
 		// return the original buffer if we couldn't send and we're less than the hard limit

@@ -19,7 +19,7 @@ type RecorderReporter struct {
 	sync.RWMutex
 }
 
-func (r *RecorderReporter) Report(ctx context.Context, data []string) error {
+func (r *RecorderReporter) Report(_ context.Context, data []string) error {
 	func() {
 		r.Lock()
 		defer r.Unlock()
@@ -53,23 +53,27 @@ func TestOptionsValidations(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, databuffer.GetDefaultOptions[string]().BufferHardLimit, opts.BufferHardLimit)
 
+	// Make sure MaxBufferSize is set to a default sane value if the given one is nonsensical
 	opts = databuffer.GetDefaultOptions[string]()
 	opts.MaxBufferSize = 0
 	opts, err = databuffer.ValidateOptions(opts)
 	require.NoError(t, err)
 	require.Equal(t, databuffer.GetDefaultOptions[string]().MaxBufferSize, opts.MaxBufferSize)
 
+	// Make sure the number of workers is set to a default sane value if the given one is nonsensical
 	opts = databuffer.GetDefaultOptions[string]()
 	opts.NumWorkers = 0
 	opts, err = databuffer.ValidateOptions(opts)
 	require.NoError(t, err)
 	require.Equal(t, databuffer.GetDefaultOptions[string]().NumWorkers, opts.NumWorkers)
 
+	// Make sure we error if the Reporter function is not assigned
 	opts = databuffer.GetDefaultOptions[string]()
 	opts.Reporter = nil
-	opts, err = databuffer.ValidateOptions(opts)
+	_, err = databuffer.ValidateOptions(opts)
 	require.Error(t, err)
 
+	// Make sure worker wait time before flushing is set to a default sane value if the given one is nonsensical
 	opts = databuffer.GetDefaultOptions[string]()
 	opts.WorkerWait = -1
 	opts, err = databuffer.ValidateOptions(opts)
@@ -86,7 +90,7 @@ func TestDataBuffer(t *testing.T) {
 		NumWorkers:    6,
 		MaxBufferSize: 128,
 		WorkerWait:    3 * time.Second,
-		Reporter:      reporter,
+		Reporter:      reporter.Report,
 	}
 
 	dbuf, err := databuffer.New(opts)
@@ -126,7 +130,7 @@ func TestDataBufferSlices(t *testing.T) {
 		MaxBufferSize:  512,
 		ChanBufferSize: 512 / 4,
 		WorkerWait:     3 * time.Second,
-		Reporter:       reporter,
+		Reporter:       reporter.Report,
 	}
 
 	dbuf, err := databuffer.New(opts)

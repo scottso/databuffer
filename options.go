@@ -35,9 +35,7 @@ type Options[T any] struct {
 	Reporter Reporter[T]
 }
 
-type DefaultReporter[T any] struct{}
-
-func (d DefaultReporter[T]) Report(context.Context, []T) error { return nil }
+func DefaultReporter[T any](context.Context, []T) error { return nil }
 
 func GetDefaultOptions[T any]() Options[T] {
 	return Options[T]{
@@ -45,7 +43,7 @@ func GetDefaultOptions[T any]() Options[T] {
 		BufferHardLimit: defaultBufferHardLimit,
 		NumWorkers:      defaultNumWorkers,
 		WorkerWait:      defaultWorkerWait,
-		Reporter:        DefaultReporter[T]{},
+		Reporter:        DefaultReporter[T],
 	}
 }
 
