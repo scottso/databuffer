@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type Reporter[T any] func(context.Context, []T) error
+type reporter[T any] func(context.Context, []T) error
 
 type DataBuffer[T any] struct {
 	numWorkers      int
@@ -19,7 +19,7 @@ type DataBuffer[T any] struct {
 	logger          zerolog.Logger
 	in              chan []T
 	startOnce       sync.Once
-	Reporter[T]
+	reporter[T]
 }
 
 // Start the workers.
@@ -46,7 +46,7 @@ func (b *DataBuffer[T]) report(ctx context.Context, buffer []T) []T {
 
 	logger.Debug().Int("sent", len(buffer)).Msgf("%T databuffer worker sending items", *new(T))
 
-	if err := b.Reporter(ctx, buffer); err != nil {
+	if err := b.reporter(ctx, buffer); err != nil {
 		logger.Error().Err(err).Msgf("%T databuffer worker error sending data", *new(T))
 
 		// return the original buffer if we couldn't send and we're less than the hard limit
@@ -64,8 +64,8 @@ func (b *DataBuffer[T]) report(ctx context.Context, buffer []T) []T {
 }
 
 func (b *DataBuffer[T]) worker(ctx context.Context, workerID int) {
-	const staggerWait = 1
-	time.Sleep(time.Duration(workerID*staggerWait) * time.Second)
+	// Stagger worker startup so they don't all send at the same time.
+	time.Sleep(time.Duration(workerID) * time.Second)
 
 	buffer := make([]T, 0, b.maxBufferSize)
 	ticker := time.Tick(b.workerWait)
@@ -119,6 +119,6 @@ func New[T any](options ...Options[T]) (*DataBuffer[T], error) {
 		workerWait:      opts.WorkerWait,
 		in:              ch,
 		logger:          log.Logger,
-		Reporter:        opts.Reporter,
+		reporter:        opts.Reporter,
 	}, nil
 }
