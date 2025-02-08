@@ -32,10 +32,12 @@ type Options[T any] struct {
 	// Size of the worker channel buffer.  Defaults to unbuffered channel.
 	ChanBufferSize int
 	// This must be concurrency safe or panics will occur
-	Reporter reporter[T]
+	Reporter Reporter[T]
 }
 
-func DefaultReporter[T any](context.Context, []T) error { return nil }
+type DefaultReporter[T any] struct{}
+
+func (d *DefaultReporter[T]) Report(context.Context, []T) error { return nil }
 
 func GetDefaultOptions[T any]() Options[T] {
 	return Options[T]{
@@ -43,7 +45,7 @@ func GetDefaultOptions[T any]() Options[T] {
 		BufferHardLimit: defaultBufferHardLimit,
 		NumWorkers:      defaultNumWorkers,
 		WorkerWait:      defaultWorkerWait,
-		Reporter:        DefaultReporter[T],
+		Reporter:        &DefaultReporter[T]{},
 	}
 }
 

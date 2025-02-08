@@ -90,7 +90,7 @@ func TestDataBuffer(t *testing.T) {
 		NumWorkers:    6,
 		MaxBufferSize: 128,
 		WorkerWait:    3 * time.Second,
-		Reporter:      reporter.Report,
+		Reporter:      reporter,
 	}
 
 	dbuf, err := databuffer.New(opts)
@@ -130,7 +130,7 @@ func TestDataBufferSlices(t *testing.T) {
 		MaxBufferSize:  512,
 		ChanBufferSize: 512 / 4,
 		WorkerWait:     3 * time.Second,
-		Reporter:       reporter.Report,
+		Reporter:       reporter,
 	}
 
 	dbuf, err := databuffer.New(opts)
