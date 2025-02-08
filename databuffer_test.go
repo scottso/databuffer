@@ -3,14 +3,12 @@ package databuffer_test
 import (
 	"context"
 	"math/rand/v2"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/scottso/databuffer"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,13 +35,6 @@ func (r *RecorderReporter) GetResults() []string {
 	r.RLock()
 	defer r.RUnlock()
 	return r.results
-}
-
-func init() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.TimeOnly}).
-		With().
-		Caller().
-		Logger()
 }
 
 func TestOptionsValidations(t *testing.T) {
@@ -86,12 +77,11 @@ func TestDataBuffer(t *testing.T) {
 
 	reporter := &RecorderReporter{}
 
-	opts := databuffer.Options[string]{
-		NumWorkers:    6,
-		MaxBufferSize: 128,
-		WorkerWait:    3 * time.Second,
-		Reporter:      reporter,
-	}
+	opts := databuffer.GetDefaultOptions[string]()
+	opts.NumWorkers = 6
+	opts.MaxBufferSize = 128
+	opts.WorkerWait = 3 * time.Second
+	opts.Reporter = reporter
 
 	dbuf, err := databuffer.New(opts)
 	require.NoError(t, err)

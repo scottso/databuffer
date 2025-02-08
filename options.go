@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -33,6 +31,8 @@ type Options[T any] struct {
 	ChanBufferSize int
 	// This must be concurrency safe or panics will occur
 	Reporter Reporter[T]
+	// Logger
+	Logger Logger
 }
 
 type DefaultReporter[T any] struct{}
@@ -46,38 +46,54 @@ func GetDefaultOptions[T any]() Options[T] {
 		NumWorkers:      defaultNumWorkers,
 		WorkerWait:      defaultWorkerWait,
 		Reporter:        &DefaultReporter[T]{},
+		Logger:          createLogger(),
 	}
 }
 
 func ValidateOptions[T any](opts Options[T]) (Options[T], error) {
+	if opts.Logger == nil {
+		opts.Logger = createLogger()
+	}
+
 	if opts.Reporter == nil {
 		err := errors.New("databuffer reporter method is nil")
-		log.Error().Err(err).Send()
+		opts.Logger.Errorf("error %s", err)
 		return opts, err
 	}
 
 	if opts.WorkerWait <= 0 {
-		log.Warn().
-			Msgf("invalid databuffer worker wait time is %s; setting to %s", opts.WorkerWait, defaultWorkerWait)
+		opts.Logger.Warnf(
+			"invalid databuffer worker wait time is %s; setting to %s",
+			opts.WorkerWait,
+			defaultWorkerWait,
+		)
 		opts.WorkerWait = time.Minute
 	}
 
 	if opts.MaxBufferSize <= 0 {
-		log.Warn().
-			Msgf("invalid data buffer size %d, setting to %d", opts.MaxBufferSize, defaultMaxBufferSize)
+		opts.Logger.Warnf(
+			"invalid data buffer size %d, setting to %d",
+			opts.MaxBufferSize,
+			defaultMaxBufferSize,
+		)
 		opts.MaxBufferSize = defaultMaxBufferSize
 	}
 
 	if opts.BufferHardLimit < 0 ||
 		opts.BufferHardLimit > 0 && opts.BufferHardLimit < opts.MaxBufferSize {
-		log.Warn().
-			Msgf("buffer hard limit is less than max buffer size; setting to %d", defaultBufferHardLimit)
+		opts.Logger.Warnf(
+			"buffer hard limit is less than max buffer size; setting to %d",
+			defaultBufferHardLimit,
+		)
 		opts.BufferHardLimit = defaultBufferHardLimit
 	}
 
 	if opts.NumWorkers < 1 {
-		log.Warn().
-			Msgf("invalid number of workers %d, setting to default of %d", opts.NumWorkers, defaultNumWorkers)
+		opts.Logger.Warnf(
+			"invalid number of workers %d, setting to default of %d",
+			opts.NumWorkers,
+			defaultNumWorkers,
+		)
 		opts.NumWorkers = defaultNumWorkers
 	}
 
