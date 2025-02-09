@@ -7,11 +7,8 @@ import (
 )
 
 func newLogger[T any]() *slog.Logger {
-	l := slog.New(slog.NewJSONHandler(os.Stdout, nil)).
+	l := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})).
 		With(slog.String("databuffer_type", fmt.Sprintf("%T", *new(T))))
-
-	slog.SetDefault(l)
-	slog.SetLogLoggerLevel(slog.LevelDebug)
 
 	return l
 }
