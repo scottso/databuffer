@@ -2,6 +2,7 @@ package databuffer
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -15,7 +16,7 @@ type DataBuffer[T any] struct {
 	maxBufferSize   int
 	bufferHardLimit int
 	workerWait      time.Duration
-	logger          Logger
+	logger          *slog.Logger
 	in              chan []T
 	startOnce       sync.Once
 	Reporter[T]
@@ -24,7 +25,7 @@ type DataBuffer[T any] struct {
 // Start the workers.
 func (b *DataBuffer[T]) Start(ctx context.Context) {
 	b.startOnce.Do(func() {
-		b.logger.Infof("Starting %d %T databuffer workers", b.numWorkers, *new(T))
+		b.logger.Info("Starting databuffer workers", slog.Int("num_workers", b.numWorkers))
 		for i := range b.numWorkers {
 			go b.worker(ctx, i)
 		}
@@ -41,17 +42,17 @@ func (b *DataBuffer[T]) report(ctx context.Context, buffer []T) []T {
 		return buffer
 	}
 
-	b.logger.Debugf("%T databuffer worker sending items", *new(T))
+	b.logger.DebugContext(ctx, "databuffer worker sending items")
 
 	if err := b.Report(ctx, buffer); err != nil {
-		b.logger.Errorf("%T databuffer worker error sending data", *new(T))
+		b.logger.ErrorContext(ctx, "databuffer worker error sending data")
 
 		// return the original buffer if we couldn't send and we're less than the hard limit
 		if len(buffer) <= b.bufferHardLimit || b.bufferHardLimit == 0 {
 			return buffer
 		}
 
-		b.logger.Warnf("%T databuffer worker buffer hit hard limit; dropping data", *new(T))
+		b.logger.WarnContext(ctx, "databuffer worker buffer hit hard limit; dropping data")
 	}
 
 	// return a new empty buffer if we sent them off successfully
@@ -77,7 +78,7 @@ workerLoop:
 				break workerLoop
 			}
 		case <-ticker:
-			b.logger.Debugf("%T databuffer worker wait ticker fired", *new(T))
+			b.logger.DebugContext(ctx, "databuffer worker wait ticker fired")
 			buffer = b.report(ctx, buffer)
 		case <-ctx.Done():
 			if workerID == 0 {
@@ -87,7 +88,7 @@ workerLoop:
 		}
 	}
 
-	b.logger.Debugf("%T databuffer worker sending any remaining data and shutting down", *new(T))
+	b.logger.DebugContext(ctx, "databuffer worker sending any remaining data and shutting down")
 	b.report(ctx, buffer)
 }
 

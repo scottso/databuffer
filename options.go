@@ -3,6 +3,7 @@ package databuffer
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 )
 
@@ -32,7 +33,7 @@ type Options[T any] struct {
 	// This must be concurrency safe or panics will occur
 	Reporter Reporter[T]
 	// Logger
-	Logger Logger
+	Logger *slog.Logger
 }
 
 type DefaultReporter[T any] struct{}
@@ -46,53 +47,53 @@ func GetDefaultOptions[T any]() Options[T] {
 		NumWorkers:      defaultNumWorkers,
 		WorkerWait:      defaultWorkerWait,
 		Reporter:        &DefaultReporter[T]{},
-		Logger:          createLogger(),
+		Logger:          newLogger[T](),
 	}
 }
 
 func ValidateOptions[T any](opts Options[T]) (Options[T], error) {
 	if opts.Logger == nil {
-		opts.Logger = createLogger()
+		opts.Logger = newLogger[T]()
 	}
 
 	if opts.Reporter == nil {
 		err := errors.New("databuffer reporter method is nil")
-		opts.Logger.Errorf("error %s", err)
+		opts.Logger.Error("error validating options", slog.Any("error", err))
 		return opts, err
 	}
 
 	if opts.WorkerWait <= 0 {
-		opts.Logger.Warnf(
-			"invalid databuffer worker wait time is %s; setting to %s",
-			opts.WorkerWait,
-			defaultWorkerWait,
+		opts.Logger.Warn(
+			"invalid databuffer worker wait time; setting to default",
+			slog.Duration("wanted", opts.WorkerWait),
+			slog.String("set", defaultWorkerWait.String()),
 		)
-		opts.WorkerWait = time.Minute
+		opts.WorkerWait = defaultWorkerWait
 	}
 
 	if opts.MaxBufferSize <= 0 {
-		opts.Logger.Warnf(
-			"invalid data buffer size %d, setting to %d",
-			opts.MaxBufferSize,
-			defaultMaxBufferSize,
+		opts.Logger.Warn(
+			"invalid data buffer size; setting to default",
+			slog.Int("wanted", opts.MaxBufferSize),
+			slog.Int("set", defaultMaxBufferSize),
 		)
 		opts.MaxBufferSize = defaultMaxBufferSize
 	}
 
 	if opts.BufferHardLimit < 0 ||
 		opts.BufferHardLimit > 0 && opts.BufferHardLimit < opts.MaxBufferSize {
-		opts.Logger.Warnf(
-			"buffer hard limit is less than max buffer size; setting to %d",
-			defaultBufferHardLimit,
+		opts.Logger.Warn(
+			"buffer hard limit is less than max buffer size; setting to default",
+			slog.Int("set", defaultBufferHardLimit),
 		)
 		opts.BufferHardLimit = defaultBufferHardLimit
 	}
 
 	if opts.NumWorkers < 1 {
-		opts.Logger.Warnf(
-			"invalid number of workers %d, setting to default of %d",
-			opts.NumWorkers,
-			defaultNumWorkers,
+		opts.Logger.Warn(
+			"invalid number of workers; setting to default",
+			slog.Int("wanted", opts.NumWorkers),
+			slog.Int("set", defaultNumWorkers),
 		)
 		opts.NumWorkers = defaultNumWorkers
 	}
