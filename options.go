@@ -66,7 +66,7 @@ func ValidateOptions[T any](opts Options[T]) (Options[T], error) {
 		opts.Logger.Warn(
 			"invalid databuffer worker wait time; setting to default",
 			slog.Duration("wanted", opts.WorkerWait),
-			slog.String("set", defaultWorkerWait.String()),
+			slog.String("used", defaultWorkerWait.String()),
 		)
 		opts.WorkerWait = defaultWorkerWait
 	}
@@ -75,7 +75,7 @@ func ValidateOptions[T any](opts Options[T]) (Options[T], error) {
 		opts.Logger.Warn(
 			"invalid data buffer size; setting to default",
 			slog.Int("wanted", opts.MaxBufferSize),
-			slog.Int("set", defaultMaxBufferSize),
+			slog.Int("used", defaultMaxBufferSize),
 		)
 		opts.MaxBufferSize = defaultMaxBufferSize
 	}
@@ -84,7 +84,7 @@ func ValidateOptions[T any](opts Options[T]) (Options[T], error) {
 		opts.BufferHardLimit > 0 && opts.BufferHardLimit < opts.MaxBufferSize {
 		opts.Logger.Warn(
 			"buffer hard limit is less than max buffer size; setting to default",
-			slog.Int("set", defaultBufferHardLimit),
+			slog.Int("used", defaultBufferHardLimit),
 		)
 		opts.BufferHardLimit = defaultBufferHardLimit
 	}
@@ -93,7 +93,7 @@ func ValidateOptions[T any](opts Options[T]) (Options[T], error) {
 		opts.Logger.Warn(
 			"invalid number of workers; setting to default",
 			slog.Int("wanted", opts.NumWorkers),
-			slog.Int("set", defaultNumWorkers),
+			slog.Int("used", defaultNumWorkers),
 		)
 		opts.NumWorkers = defaultNumWorkers
 	}
