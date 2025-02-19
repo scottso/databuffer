@@ -47,13 +47,13 @@ func GetDefaultOptions[T any]() Options[T] {
 		NumWorkers:      defaultNumWorkers,
 		WorkerWait:      defaultWorkerWait,
 		Reporter:        &DefaultReporter[T]{},
-		Logger:          newLogger[T](),
+		Logger:          NewLogger[T](),
 	}
 }
 
 func ValidateOptions[T any](opts Options[T]) (Options[T], error) {
 	if opts.Logger == nil {
-		opts.Logger = newLogger[T]()
+		opts.Logger = NewLogger[T]()
 	}
 
 	if opts.Reporter == nil {

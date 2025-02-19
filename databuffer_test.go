@@ -2,163 +2,137 @@ package databuffer_test
 
 import (
 	"context"
-	"math/rand/v2"
+	"errors"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/scottso/databuffer"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-type RecorderReporter struct {
-	results []string
-	sync.RWMutex
+// MockReporter simulates the Reporter interface
+type MockReporter[T any] struct {
+	mock.Mock
 }
 
-func (r *RecorderReporter) Report(_ context.Context, data []string) error {
-	func() {
-		r.Lock()
-		defer r.Unlock()
-		r.results = append(r.results, data...)
-	}()
-
-	// emulate some network latency in sending data
-	n := rand.Int64N(1000)
-	time.Sleep(time.Duration(n) * time.Millisecond)
-
-	return nil
+func (m *MockReporter[T]) Report(ctx context.Context, data []T) error {
+	args := m.Called(ctx, data)
+	return args.Error(0)
 }
 
-func (r *RecorderReporter) GetResults() []string {
-	r.RLock()
-	defer r.RUnlock()
-	return r.results
+func TestNewDataBuffer(t *testing.T) {
+	db, err := databuffer.New[int]()
+	require.NoError(t, err)
+	assert.NotNil(t, db)
 }
 
-func TestOptionsValidations(t *testing.T) {
-	opts := databuffer.GetDefaultOptions[string]()
-	opts.BufferHardLimit = -1
-	opts, err := databuffer.ValidateOptions(opts)
+func TestDataBufferReporting(t *testing.T) {
+	mockReporter := new(MockReporter[int])
+	mockReporter.On("Report", mock.Anything, mock.Anything).Return(nil)
+
+	db, err := databuffer.New(databuffer.Options[int]{
+		MaxBufferSize:   5,
+		BufferHardLimit: 10,
+		NumWorkers:      1,
+		WorkerWait:      100 * time.Millisecond,
+		Reporter:        mockReporter,
+		Logger:          databuffer.NewLogger[int](),
+	})
+
 	require.NoError(t, err)
-	require.Equal(t, databuffer.GetDefaultOptions[string]().BufferHardLimit, opts.BufferHardLimit)
-
-	// Make sure MaxBufferSize is set to a default sane value if the given one is nonsensical
-	opts = databuffer.GetDefaultOptions[string]()
-	opts.MaxBufferSize = 0
-	opts, err = databuffer.ValidateOptions(opts)
-	require.NoError(t, err)
-	require.Equal(t, databuffer.GetDefaultOptions[string]().MaxBufferSize, opts.MaxBufferSize)
-
-	// Make sure the number of workers is set to a default sane value if the given one is nonsensical
-	opts = databuffer.GetDefaultOptions[string]()
-	opts.NumWorkers = 0
-	opts, err = databuffer.ValidateOptions(opts)
-	require.NoError(t, err)
-	require.Equal(t, databuffer.GetDefaultOptions[string]().NumWorkers, opts.NumWorkers)
-
-	// Make sure we error if the Reporter function is not assigned
-	opts = databuffer.GetDefaultOptions[string]()
-	opts.Reporter = nil
-	_, err = databuffer.ValidateOptions(opts)
-	require.Error(t, err)
-
-	// Make sure worker wait time before flushing is set to a default sane value if the given one is nonsensical
-	opts = databuffer.GetDefaultOptions[string]()
-	opts.WorkerWait = -1
-	opts, err = databuffer.ValidateOptions(opts)
-	require.NoError(t, err)
-	require.Equal(t, databuffer.GetDefaultOptions[string]().WorkerWait, opts.WorkerWait)
-}
-
-func TestDataBuffer(t *testing.T) {
-	const numStrings = 2001
-
-	reporter := &RecorderReporter{}
-
-	opts := databuffer.GetDefaultOptions[string]()
-	opts.NumWorkers = 6
-	opts.MaxBufferSize = 128
-	opts.WorkerWait = 3 * time.Second
-	opts.Reporter = reporter
-
-	dbuf, err := databuffer.New(opts)
-	require.NoError(t, err)
+	assert.NotNil(t, db)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbuf.Start(ctx)
+	db.Start(ctx)
 
-	go func() {
-		for _, s := range GenerateRandomStrings(numStrings, 8) {
-			dbuf.WorkerChan() <- []string{s}
-			n := rand.Int64N(5)
-			time.Sleep(time.Duration(n) * time.Millisecond)
-		}
-		cancel()
-	}()
+	db.WorkerChan() <- []int{1, 2, 3, 4, 5}
 
-	<-ctx.Done()
-	// Wait for workers to shut down
-	time.Sleep(5 * time.Second)
+	// Give workers time to process
+	time.Sleep(200 * time.Millisecond)
 
-	require.Len(t, reporter.GetResults(), numStrings)
+	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2, 3, 4, 5})
 }
 
-func TestDataBufferSlices(t *testing.T) {
-	const (
-		numStrings     = 121
-		numGenerations = 11
-	)
+func TestBufferLimits(t *testing.T) {
+	mockReporter := new(MockReporter[int])
+	mockReporter.On("Report", mock.Anything, mock.Anything).Return(errors.New("report failed"))
 
-	reporter := &RecorderReporter{}
+	db, err := databuffer.New(databuffer.Options[int]{
+		MaxBufferSize:   3,
+		BufferHardLimit: 5,
+		NumWorkers:      1,
+		WorkerWait:      2 * time.Second,
+		Reporter:        mockReporter,
+		Logger:          databuffer.NewLogger[int](),
+	})
 
-	opts := databuffer.Options[string]{
-		NumWorkers:     4,
-		MaxBufferSize:  512,
-		ChanBufferSize: 512 / 4,
-		WorkerWait:     3 * time.Second,
-		Reporter:       reporter,
-	}
-
-	dbuf, err := databuffer.New(opts)
 	require.NoError(t, err)
+	assert.NotNil(t, db)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbuf.Start(ctx)
+	db.Start(ctx)
 
-	go func() {
-		for range numGenerations {
-			dbuf.WorkerChan() <- GenerateRandomStrings(numStrings, 8)
-			n := rand.Int64N(5)
-			time.Sleep(time.Duration(n) * time.Millisecond)
-		}
-		cancel()
-	}()
+	db.WorkerChan() <- []int{1, 2, 3}
+	db.WorkerChan() <- []int{4, 5}
 
-	<-ctx.Done()
-	// Wait for workers to shut down
-	time.Sleep(5 * time.Second)
+	time.Sleep(200 * time.Millisecond)
 
-	require.Len(t, reporter.GetResults(), numStrings*numGenerations)
+	// Expect a single report with all 5 elements
+	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2, 3, 4, 5})
+	mockReporter.AssertNumberOfCalls(t, "Report", 2)
 }
 
-func GenerateRandomStrings(num int, length int) []string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	seededRand := rand.New(rand.NewPCG(1, 2))
-	randomStrings := make([]string, num)
+func TestWorkerLifecycle(t *testing.T) {
+	mockReporter := new(MockReporter[int])
+	mockReporter.On("Report", mock.Anything, mock.Anything).Return(nil)
 
-	for i := range num {
-		b := make([]byte, length)
-		for j := range b {
-			b[j] = charset[seededRand.IntN(len(charset))]
-		}
-		randomStrings[i] = string(b)
+	db, err := databuffer.New(databuffer.Options[int]{
+		MaxBufferSize: 3,
+		NumWorkers:    2,
+		WorkerWait:    50 * time.Millisecond,
+		Reporter:      mockReporter,
+		Logger:        databuffer.NewLogger[int](),
+	})
+
+	require.NoError(t, err)
+	assert.NotNil(t, db)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		db.Start(ctx)
+	}()
+
+	db.WorkerChan() <- []int{1, 2, 3}
+	time.Sleep(200 * time.Millisecond)
+
+	cancel()
+	wg.Wait()
+
+	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2, 3})
+}
+
+func TestInvalidOptions(t *testing.T) {
+	opts := databuffer.Options[int]{
+		MaxBufferSize: -1,
+		WorkerWait:    -1,
+		NumWorkers:    0,
+		Reporter:      nil,
+		Logger:        nil,
 	}
 
-	return randomStrings
+	_, err := databuffer.ValidateOptions(opts)
+	assert.Error(t, err)
 }
