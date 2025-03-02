@@ -15,6 +15,7 @@ type DataBuffer[T any] struct {
 	numWorkers      int
 	maxBufferSize   int
 	bufferHardLimit int
+	chanBufferSize  int
 	workerWait      time.Duration
 	logger          *slog.Logger
 	in              chan []T
@@ -92,26 +93,26 @@ workerLoop:
 	b.report(ctx, buffer)
 }
 
-func New[T any](options ...Options[T]) (*DataBuffer[T], error) {
-	opts := GetDefaultOptions[T]()
-	if len(options) > 0 {
-		opts = options[0]
+func (b *DataBuffer[T]) options(opts ...option[T]) {
+	for _, opt := range opts {
+		opt(b)
+	}
+}
+
+func New[T any](options ...option[T]) (*DataBuffer[T], error) {
+	d := &DataBuffer[T]{
+		numWorkers:      defaultNumWorkers,
+		maxBufferSize:   defaultMaxBufferSize,
+		bufferHardLimit: defaultBufferHardLimit,
+		workerWait:      defaultWorkerWait,
+		chanBufferSize:  defaultChannelBufferSize,
+		Reporter:        &DefaultReporter[T]{},
+		logger:          NewLogger[T](),
 	}
 
-	opts, err := ValidateOptions(opts)
-	if err != nil {
-		return nil, err
-	}
+	d.options(options...)
 
-	ch := make(chan []T, opts.ChanBufferSize)
+	d.in = make(chan []T, d.chanBufferSize)
 
-	return &DataBuffer[T]{
-		numWorkers:      opts.NumWorkers,
-		maxBufferSize:   opts.MaxBufferSize,
-		bufferHardLimit: opts.BufferHardLimit,
-		workerWait:      opts.WorkerWait,
-		in:              ch,
-		Reporter:        opts.Reporter,
-		logger:          opts.Logger,
-	}, nil
+	return d, nil
 }
