@@ -42,7 +42,7 @@ func main() {
 		databuffer.NumWorkers[int](4),
 		databuffer.WorkerWait[int](5*time.Minute),
 		databuffer.SetReporter(r.Report),
-    databuffer.ChanBufferSize[int](16),
+		databuffer.ChanBufferSize[int](16),
 	)
 
 	dBuf, err := databuffer.New(opts)
