@@ -105,17 +105,12 @@ func New[T any](options ...option[T]) (*DataBuffer[T], error) {
 		maxBufferSize:   defaultMaxBufferSize,
 		bufferHardLimit: defaultBufferHardLimit,
 		workerWait:      defaultWorkerWait,
-		chanBufferSize:  0,
+		chanBufferSize:  defaultChannelBufferSize,
 		Reporter:        &DefaultReporter[T]{},
 		logger:          NewLogger[T](),
 	}
 
 	d.options(options...)
-
-	// opts, err := ValidateOptions(opts)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	d.in = make(chan []T, d.chanBufferSize)
 

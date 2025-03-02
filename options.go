@@ -7,10 +7,11 @@ import (
 )
 
 const (
-	defaultMaxBufferSize   = 64
-	defaultBufferHardLimit = defaultMaxBufferSize * 2
-	defaultNumWorkers      = 2
-	defaultWorkerWait      = time.Minute
+	defaultMaxBufferSize     = 64
+	defaultBufferHardLimit   = defaultMaxBufferSize * 2
+	defaultNumWorkers        = 2
+	defaultWorkerWait        = time.Minute
+	defaultChannelBufferSize = 4 * defaultNumWorkers
 )
 
 type option[T any] func(*DataBuffer[T])
