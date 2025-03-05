@@ -217,7 +217,7 @@ func TestMultipleWorkers(t *testing.T) {
 
 	// Setup the mock to acquire the mutex before recording calls
 	mockReporter.On("Report", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
+		Run(func(_ mock.Arguments) {
 			mockMutex.Lock()
 			defer mockMutex.Unlock()
 		}).
@@ -237,7 +237,7 @@ func TestMultipleWorkers(t *testing.T) {
 	db.Start(ctx)
 
 	// Send items to be distributed across workers
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		db.WorkerChan() <- []int{i}
 	}
 
@@ -254,7 +254,7 @@ func TestMultipleWorkers(t *testing.T) {
 	mockMutex.Unlock()
 
 	// Verify the reporter was called at least once
-	assert.True(t, callCount > 0, "Reporter should have been called at least once")
+	assert.Positive(t, callCount, "Reporter should have been called at least once")
 }
 
 func TestHardLimitBehavior(t *testing.T) {
@@ -309,7 +309,7 @@ func TestChanBufferSize(t *testing.T) {
 
 	// We can't directly test channel buffer size, but we can verify we can send
 	// many items without blocking
-	for i := 0; i < customChanSize; i++ {
+	for i := range customChanSize {
 		select {
 		case db.WorkerChan() <- []int{i}:
 			// Should not block
@@ -349,7 +349,7 @@ func TestChannelBufferSizeOption(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test we can send the exact number of items without blocking
-	for i := 0; i < customSize; i++ {
+	for i := range customSize {
 		select {
 		case db.WorkerChan() <- []int{i}:
 			// Should not block
