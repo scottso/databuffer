@@ -339,6 +339,17 @@ func TestInvalidOptionValues(t *testing.T) {
 	cancel()
 }
 
+func TestNilReporter(t *testing.T) {
+	// Test creating a DataBuffer with a nil reporter
+	db, err := databuffer.New(
+		databuffer.SetReporter[int](nil),
+	)
+
+	// Should fail with an error when a nil reporter is provided
+	require.Error(t, err)
+	require.Nil(t, db)
+}
+
 func TestChannelBufferSizeOption(t *testing.T) {
 	// Test custom channel buffer size
 	customSize := 8

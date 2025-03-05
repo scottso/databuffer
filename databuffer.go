@@ -2,10 +2,13 @@ package databuffer
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
 )
+
+var ErrNilReporter = errors.New("reporter cannot be nil")
 
 type Reporter[T any] interface {
 	Report(context.Context, []T) error
@@ -111,6 +114,11 @@ func New[T any](options ...option[T]) (*DataBuffer[T], error) {
 	}
 
 	d.options(options...)
+
+	// Check if Reporter is nil
+	if d.Reporter == nil {
+		return nil, ErrNilReporter
+	}
 
 	d.in = make(chan []T, d.chanBufferSize)
 
