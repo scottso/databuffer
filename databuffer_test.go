@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -27,7 +26,7 @@ func (m *MockReporter[T]) Report(ctx context.Context, data []T) error {
 func TestNewDataBuffer(t *testing.T) {
 	db, err := databuffer.New[int]()
 	require.NoError(t, err)
-	assert.NotNil(t, db)
+	require.NotNil(t, db)
 }
 
 func TestDataBufferReporting(t *testing.T) {
@@ -44,7 +43,7 @@ func TestDataBufferReporting(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	assert.NotNil(t, db)
+	require.NotNil(t, db)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -73,7 +72,7 @@ func TestBufferLimits(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	assert.NotNil(t, db)
+	require.NotNil(t, db)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -104,7 +103,7 @@ func TestWorkerLifecycle(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	assert.NotNil(t, db)
+	require.NotNil(t, db)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -159,7 +158,7 @@ func TestDefaultOptions(t *testing.T) {
 		databuffer.WorkerWait[string](50*time.Millisecond), // Need shorter wait time for test
 	)
 	require.NoError(t, err)
-	assert.NotNil(t, db)
+	require.NotNil(t, db)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -254,7 +253,7 @@ func TestMultipleWorkers(t *testing.T) {
 	mockMutex.Unlock()
 
 	// Verify the reporter was called at least once
-	assert.Positive(t, callCount, "Reporter should have been called at least once")
+	require.Positive(t, callCount, "Reporter should have been called at least once")
 }
 
 func TestHardLimitBehavior(t *testing.T) {
@@ -330,7 +329,7 @@ func TestInvalidOptionValues(t *testing.T) {
 		databuffer.WorkerWait[int](-1),
 	)
 	require.NoError(t, err)
-	assert.NotNil(t, db)
+	require.NotNil(t, db)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
