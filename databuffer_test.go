@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/scottso/databuffer"
 )
@@ -23,13 +23,28 @@ func (m *MockReporter[T]) Report(ctx context.Context, data []T) error {
 	return args.Error(0)
 }
 
-func TestNewDataBuffer(t *testing.T) {
-	db, err := databuffer.New[int]()
-	require.NoError(t, err)
-	require.NotNil(t, db)
+// DataBufferSuite defines the test suite
+type DataBufferSuite struct {
+	suite.Suite
+	ctxCancel context.CancelFunc
+	ctx       context.Context
 }
 
-func TestDataBufferReporting(t *testing.T) {
+func (s *DataBufferSuite) SetupTest() {
+	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
+}
+
+func (s *DataBufferSuite) TearDownTest() {
+	s.ctxCancel()
+}
+
+func (s *DataBufferSuite) TestNewDataBuffer() {
+	db, err := databuffer.New[int]()
+	s.Require().NoError(err)
+	s.Require().NotNil(db)
+}
+
+func (s *DataBufferSuite) TestDataBufferReporting() {
 	mockReporter := new(MockReporter[int])
 	mockReporter.On("Report", mock.Anything, mock.Anything).Return(nil)
 
@@ -42,23 +57,20 @@ func TestDataBufferReporting(t *testing.T) {
 		databuffer.SetReporter(mockReporter),
 	)
 
-	require.NoError(t, err)
-	require.NotNil(t, db)
+	s.Require().NoError(err)
+	s.Require().NotNil(db)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db.Start(ctx)
+	db.Start(s.ctx)
 
 	db.WorkerChan() <- []int{1, 2, 3, 4, 5}
 
 	// Give workers time to process
 	time.Sleep(200 * time.Millisecond)
 
-	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2, 3, 4, 5})
+	mockReporter.AssertCalled(s.T(), "Report", mock.Anything, []int{1, 2, 3, 4, 5})
 }
 
-func TestBufferLimits(t *testing.T) {
+func (s *DataBufferSuite) TestBufferLimits() {
 	mockReporter := new(MockReporter[int])
 	mockReporter.On("Report", mock.Anything, mock.Anything).Return(errors.New("report failed"))
 
@@ -71,13 +83,10 @@ func TestBufferLimits(t *testing.T) {
 		databuffer.Logger[int](databuffer.NewLogger[int]()),
 	)
 
-	require.NoError(t, err)
-	require.NotNil(t, db)
+	s.Require().NoError(err)
+	s.Require().NotNil(db)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db.Start(ctx)
+	db.Start(s.ctx)
 
 	db.WorkerChan() <- []int{1, 2, 3}
 	db.WorkerChan() <- []int{4, 5}
@@ -85,11 +94,11 @@ func TestBufferLimits(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Expect a single report with all 5 elements
-	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2, 3, 4, 5})
-	mockReporter.AssertNumberOfCalls(t, "Report", 2)
+	mockReporter.AssertCalled(s.T(), "Report", mock.Anything, []int{1, 2, 3, 4, 5})
+	mockReporter.AssertNumberOfCalls(s.T(), "Report", 2)
 }
 
-func TestWorkerLifecycle(t *testing.T) {
+func (s *DataBufferSuite) TestWorkerLifecycle() {
 	mockReporter := new(MockReporter[int])
 	mockReporter.On("Report", mock.Anything, mock.Anything).Return(nil)
 
@@ -102,17 +111,17 @@ func TestWorkerLifecycle(t *testing.T) {
 		databuffer.Logger[int](databuffer.NewLogger[int]()),
 	)
 
-	require.NoError(t, err)
-	require.NotNil(t, db)
+	s.Require().NoError(err)
+	s.Require().NotNil(db)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	localCtx, cancel := context.WithCancel(context.Background())
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		db.Start(ctx)
+		db.Start(localCtx)
 	}()
 
 	db.WorkerChan() <- []int{1, 2, 3}
@@ -121,10 +130,10 @@ func TestWorkerLifecycle(t *testing.T) {
 	cancel()
 	wg.Wait()
 
-	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2, 3})
+	mockReporter.AssertCalled(s.T(), "Report", mock.Anything, []int{1, 2, 3})
 }
 
-func TestMultipleStartCalls(t *testing.T) {
+func (s *DataBufferSuite) TestMultipleStartCalls() {
 	mockReporter := new(MockReporter[int])
 	mockReporter.On("Report", mock.Anything, mock.Anything).Return(nil)
 
@@ -133,22 +142,19 @@ func TestMultipleStartCalls(t *testing.T) {
 		databuffer.WorkerWait[int](50*time.Millisecond),
 		databuffer.SetReporter(mockReporter),
 	)
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	s.Require().NoError(err)
 
 	// Call Start multiple times to test startOnce functionality
-	db.Start(ctx)
-	db.Start(ctx) // This should be a no-op due to sync.Once
+	db.Start(s.ctx)
+	db.Start(s.ctx) // This should be a no-op due to sync.Once
 
 	db.WorkerChan() <- []int{1, 2, 3}
 	time.Sleep(100 * time.Millisecond)
 
-	mockReporter.AssertNumberOfCalls(t, "Report", 1)
+	mockReporter.AssertNumberOfCalls(s.T(), "Report", 1)
 }
 
-func TestDefaultOptions(t *testing.T) {
+func (s *DataBufferSuite) TestDefaultOptions() {
 	mockReporter := new(MockReporter[string])
 	mockReporter.On("Report", mock.Anything, mock.Anything).Return(nil)
 
@@ -157,22 +163,19 @@ func TestDefaultOptions(t *testing.T) {
 		databuffer.SetReporter(mockReporter),
 		databuffer.WorkerWait[string](50*time.Millisecond), // Need shorter wait time for test
 	)
-	require.NoError(t, err)
-	require.NotNil(t, db)
+	s.Require().NoError(err)
+	s.Require().NotNil(db)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db.Start(ctx)
+	db.Start(s.ctx)
 	db.WorkerChan() <- []string{"test1", "test2"}
 
 	// Need to wait long enough for the worker to process
 	time.Sleep(200 * time.Millisecond)
 
-	mockReporter.AssertCalled(t, "Report", mock.Anything, []string{"test1", "test2"})
+	mockReporter.AssertCalled(s.T(), "Report", mock.Anything, []string{"test1", "test2"})
 }
 
-func TestBufferAutoFlushOnSize(t *testing.T) {
+func (s *DataBufferSuite) TestBufferAutoFlushOnSize() {
 	mockReporter := new(MockReporter[int])
 	mockReporter.On("Report", mock.Anything, mock.Anything).Return(nil)
 
@@ -184,30 +187,27 @@ func TestBufferAutoFlushOnSize(t *testing.T) {
 		databuffer.NumWorkers[int](1),
 		databuffer.SetReporter(mockReporter),
 	)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db.Start(ctx)
+	db.Start(s.ctx)
 
 	// Send 2 items, which is less than MaxBufferSize
 	db.WorkerChan() <- []int{1, 2}
 	time.Sleep(50 * time.Millisecond)
 
 	// Should not have triggered a report yet
-	mockReporter.AssertNumberOfCalls(t, "Report", 0)
+	mockReporter.AssertNumberOfCalls(s.T(), "Report", 0)
 
 	// Send 1 more item, which makes the buffer size equal to MaxBufferSize
 	db.WorkerChan() <- []int{3}
 	time.Sleep(50 * time.Millisecond)
 
 	// Should have triggered a report now
-	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2, 3})
-	mockReporter.AssertNumberOfCalls(t, "Report", 1)
+	mockReporter.AssertCalled(s.T(), "Report", mock.Anything, []int{1, 2, 3})
+	mockReporter.AssertNumberOfCalls(s.T(), "Report", 1)
 }
 
-func TestMultipleWorkers(t *testing.T) {
+func (s *DataBufferSuite) TestMultipleWorkers() {
 	// Create a mutex to synchronize access to the mock reporter
 	var mockMutex sync.Mutex
 
@@ -228,12 +228,9 @@ func TestMultipleWorkers(t *testing.T) {
 		databuffer.WorkerWait[int](50*time.Millisecond),
 		databuffer.SetReporter(mockReporter),
 	)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db.Start(ctx)
+	db.Start(s.ctx)
 
 	// Send items to be distributed across workers
 	for i := range 10 {
@@ -242,7 +239,7 @@ func TestMultipleWorkers(t *testing.T) {
 
 	// Allow time for workers to process
 	time.Sleep(300 * time.Millisecond)
-	cancel()
+	s.ctxCancel()
 
 	// Wait for workers to completely shut down
 	time.Sleep(200 * time.Millisecond)
@@ -253,10 +250,10 @@ func TestMultipleWorkers(t *testing.T) {
 	mockMutex.Unlock()
 
 	// Verify the reporter was called at least once
-	require.Positive(t, callCount, "Reporter should have been called at least once")
+	s.Require().Positive(callCount, "Reporter should have been called at least once")
 }
 
-func TestHardLimitBehavior(t *testing.T) {
+func (s *DataBufferSuite) TestHardLimitBehavior() {
 	mockReporter := new(MockReporter[int])
 	// Mock reporter to always fail to test hard limit behavior
 	mockReporter.On("Report", mock.Anything, mock.Anything).Return(errors.New("report error"))
@@ -268,29 +265,26 @@ func TestHardLimitBehavior(t *testing.T) {
 		databuffer.WorkerWait[int](50*time.Millisecond),
 		databuffer.SetReporter(mockReporter),
 	)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db.Start(ctx)
+	db.Start(s.ctx)
 
 	// First send 2 items (equal to MaxBufferSize)
 	db.WorkerChan() <- []int{1, 2}
 	time.Sleep(100 * time.Millisecond)
 
 	// The report fails but items are kept in buffer since we're below hard limit
-	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2})
+	mockReporter.AssertCalled(s.T(), "Report", mock.Anything, []int{1, 2})
 
 	// Send 2 more items to exceed hard limit
 	db.WorkerChan() <- []int{3, 4}
 	time.Sleep(100 * time.Millisecond)
 
 	// The buffer should have been cleared after exceeding hard limit
-	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2, 3, 4})
+	mockReporter.AssertCalled(s.T(), "Report", mock.Anything, []int{1, 2, 3, 4})
 }
 
-func TestChanBufferSize(t *testing.T) {
+func (s *DataBufferSuite) TestChanBufferSize() {
 	mockReporter := new(MockReporter[int])
 	mockReporter.On("Report", mock.Anything, mock.Anything).Return(nil)
 
@@ -299,12 +293,9 @@ func TestChanBufferSize(t *testing.T) {
 		databuffer.ChanBufferSize[int](customChanSize),
 		databuffer.SetReporter(mockReporter),
 	)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db.Start(ctx)
+	db.Start(s.ctx)
 
 	// We can't directly test channel buffer size, but we can verify we can send
 	// many items without blocking
@@ -313,14 +304,12 @@ func TestChanBufferSize(t *testing.T) {
 		case db.WorkerChan() <- []int{i}:
 			// Should not block
 		default:
-			t.Fatalf("Channel should not be full after %d sends", i)
+			s.T().Fatalf("Channel should not be full after %d sends", i)
 		}
 	}
-
-	cancel()
 }
 
-func TestInvalidOptionValues(t *testing.T) {
+func (s *DataBufferSuite) TestInvalidOptionValues() {
 	// Test with invalid option values that should use defaults
 	db, err := databuffer.New(
 		databuffer.MaxBufferSize[int](-1),
@@ -328,35 +317,31 @@ func TestInvalidOptionValues(t *testing.T) {
 		databuffer.NumWorkers[int](-1),
 		databuffer.WorkerWait[int](-1),
 	)
-	require.NoError(t, err)
-	require.NotNil(t, db)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	s.Require().NoError(err)
+	s.Require().NotNil(db)
 
 	// Should not panic when starting
-	db.Start(ctx)
-	cancel()
+	db.Start(s.ctx)
 }
 
-func TestNilReporter(t *testing.T) {
+func (s *DataBufferSuite) TestNilReporter() {
 	// Test creating a DataBuffer with a nil reporter
 	db, err := databuffer.New(
 		databuffer.SetReporter[int](nil),
 	)
 
 	// Should fail with an error when a nil reporter is provided
-	require.Error(t, err)
-	require.Nil(t, db)
+	s.Require().Error(err)
+	s.Require().Nil(db)
 }
 
-func TestChannelBufferSizeOption(t *testing.T) {
+func (s *DataBufferSuite) TestChannelBufferSizeOption() {
 	// Test custom channel buffer size
 	customSize := 8
 	db, err := databuffer.New(
 		databuffer.ChanBufferSize[int](customSize),
 	)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Test we can send the exact number of items without blocking
 	for i := range customSize {
@@ -364,12 +349,12 @@ func TestChannelBufferSizeOption(t *testing.T) {
 		case db.WorkerChan() <- []int{i}:
 			// Should not block
 		default:
-			t.Fatalf("Failed to send item %d, channel should not be full", i)
+			s.T().Fatalf("Failed to send item %d, channel should not be full", i)
 		}
 	}
 }
 
-func TestContextCancellation(t *testing.T) {
+func (s *DataBufferSuite) TestContextCancellation() {
 	// Instead of trying to test that a channel is closed (which is causing data races),
 	// let's just test that we can start the worker and cancel the context without errors
 	mockReporter := new(MockReporter[int])
@@ -380,17 +365,17 @@ func TestContextCancellation(t *testing.T) {
 		databuffer.NumWorkers[int](1),
 		databuffer.WorkerWait[int](10*time.Millisecond),
 	)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Create a context that will be canceled shortly
-	ctx, cancel := context.WithCancel(context.Background())
+	localCtx, cancel := context.WithCancel(context.Background())
 
 	// Start the worker in a goroutine so we can observe its behavior
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		db.Start(ctx)
+		db.Start(localCtx)
 	}()
 
 	// Send some data
@@ -406,5 +391,11 @@ func TestContextCancellation(t *testing.T) {
 	wg.Wait()
 
 	// Verify that the reporter was called with our data
-	mockReporter.AssertCalled(t, "Report", mock.Anything, []int{1, 2, 3})
+	mockReporter.AssertCalled(s.T(), "Report", mock.Anything, []int{1, 2, 3})
 }
+
+// Run the suite
+func TestDataBufferSuite(t *testing.T) {
+	suite.Run(t, new(DataBufferSuite))
+}
+
