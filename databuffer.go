@@ -96,13 +96,13 @@ workerLoop:
 	b.report(ctx, buffer)
 }
 
-func (b *DataBuffer[T]) options(opts ...option[T]) {
+func (b *DataBuffer[T]) options(opts ...Option[T]) {
 	for _, opt := range opts {
 		opt(b)
 	}
 }
 
-func New[T any](options ...option[T]) (*DataBuffer[T], error) {
+func New[T any](options ...Option[T]) (*DataBuffer[T], error) {
 	d := &DataBuffer[T]{
 		numWorkers:      defaultNumWorkers,
 		maxBufferSize:   defaultMaxBufferSize,

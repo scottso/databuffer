@@ -14,9 +14,9 @@ const (
 	defaultChannelBufferSize = 4 * defaultNumWorkers
 )
 
-type option[T any] func(*DataBuffer[T])
+type Option[T any] func(*DataBuffer[T])
 
-func WorkerWait[T any](duration time.Duration) option[T] {
+func WorkerWait[T any](duration time.Duration) Option[T] {
 	return func(d *DataBuffer[T]) {
 		if duration <= 0 {
 			d.workerWait = defaultWorkerWait
@@ -27,7 +27,7 @@ func WorkerWait[T any](duration time.Duration) option[T] {
 	}
 }
 
-func BufferHardLimit[T any](limit int) option[T] {
+func BufferHardLimit[T any](limit int) Option[T] {
 	return func(d *DataBuffer[T]) {
 		if limit < 0 || limit > 0 && limit < d.maxBufferSize {
 			d.bufferHardLimit = d.maxBufferSize
@@ -37,7 +37,7 @@ func BufferHardLimit[T any](limit int) option[T] {
 	}
 }
 
-func MaxBufferSize[T any](size int) option[T] {
+func MaxBufferSize[T any](size int) Option[T] {
 	return func(d *DataBuffer[T]) {
 		if size <= 0 {
 			d.maxBufferSize = defaultMaxBufferSize
@@ -47,7 +47,7 @@ func MaxBufferSize[T any](size int) option[T] {
 	}
 }
 
-func NumWorkers[T any](num int) option[T] {
+func NumWorkers[T any](num int) Option[T] {
 	return func(d *DataBuffer[T]) {
 		if num < 1 {
 			d.numWorkers = defaultNumWorkers
@@ -57,19 +57,19 @@ func NumWorkers[T any](num int) option[T] {
 	}
 }
 
-func ChanBufferSize[T any](size int) option[T] {
+func ChanBufferSize[T any](size int) Option[T] {
 	return func(d *DataBuffer[T]) {
 		d.chanBufferSize = size
 	}
 }
 
-func SetReporter[T any](r Reporter[T]) option[T] {
+func SetReporter[T any](r Reporter[T]) Option[T] {
 	return func(d *DataBuffer[T]) {
 		d.Reporter = r
 	}
 }
 
-func Logger[T any](l *slog.Logger) option[T] {
+func Logger[T any](l *slog.Logger) Option[T] {
 	return func(d *DataBuffer[T]) {
 		d.logger = l
 	}

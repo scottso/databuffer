@@ -398,4 +398,3 @@ func (s *DataBufferSuite) TestContextCancellation() {
 func TestDataBufferSuite(t *testing.T) {
 	suite.Run(t, new(DataBufferSuite))
 }
-
